@@ -1,0 +1,158 @@
+From b785477418e56cd0918021032727e372aa654c52 Mon Sep 17 00:00:00 2001
+From: niuke <sully.niu@outlook.com>
+Date: Thu, 30 Oct 2025 14:40:44 +0800
+Subject: [PATCH] support panel/eth phy
+
+---
+ drivers/net/phy/phy.c            | 109 +++++++++++++++++++++++++++++++
+ drivers/video/stm32/stm32_ltdc.c |   3 +
+ 2 files changed, 112 insertions(+)
+
+diff --git a/drivers/net/phy/phy.c b/drivers/net/phy/phy.c
+index ae21acb059b..2deae1cd035 100644
+--- a/drivers/net/phy/phy.c
++++ b/drivers/net/phy/phy.c
+@@ -214,6 +214,95 @@ int genphy_config_aneg(struct phy_device *phydev)
+ 	return result;
+ }
+ 
++/***************alientek zuozhongkai add 2021/4/23****************/
++#define YT8511_REG_DEBUG_ADDR_OFFSET		0x1e
++#define YT8511_REG_DEBUG_DATA				0x1f
++
++static int yt8511_rd_ext(struct phy_device *phydev, u32 regnum)
++{
++	int val;
++
++	phy_write(phydev, MDIO_DEVAD_NONE, YT8511_REG_DEBUG_ADDR_OFFSET, regnum);
++	val = phy_read(phydev, MDIO_DEVAD_NONE, YT8511_REG_DEBUG_DATA);
++
++	return val;
++}
++
++static int yt8511_wr_ext(struct phy_device *phydev, u32 regnum, u16 val)
++{
++	int ret;
++
++	ret = phy_write(phydev, MDIO_DEVAD_NONE, YT8511_REG_DEBUG_ADDR_OFFSET, regnum);
++	ret = phy_write(phydev, MDIO_DEVAD_NONE, YT8511_REG_DEBUG_DATA, val);
++
++	return ret;
++}
++
++int yt8511_config_txdelay(struct phy_device *phydev, u8 delay)
++{
++        int ret;
++        int val;
++
++        /* disable auto sleep */
++        val = yt8511_rd_ext(phydev, 0x27);
++        if (val < 0)
++                return val;
++
++        val &= (~BIT(15));
++
++        ret = yt8511_wr_ext(phydev, 0x27, val);
++        if (ret < 0)
++                return ret;
++
++        /* enable RXC clock when no wire plug */
++        val = yt8511_rd_ext(phydev, 0xc);
++        if (val < 0)
++                return val;
++
++        /* ext reg 0xc b[7:4]
++		Tx Delay time = 150ps * N ¨C 250ps
++        */
++        val &= ~(0xf << delay);
++        ret = yt8511_wr_ext(phydev, 0xc, val);
++        val = yt8511_rd_ext(phydev, 0xc);
++
++        return ret;
++}
++
++int yt8511_config_out_125m(struct phy_device *phydev)
++{
++        int ret;
++        int val;
++
++		/* disable auto sleep */
++        val = yt8511_rd_ext(phydev, 0x27);
++        if (val < 0)
++                return val;
++
++        val &= (~BIT(15));
++
++        ret = yt8511_wr_ext(phydev, 0x27, val);
++        if (ret < 0)
++                return ret;
++
++        /* enable RXC clock when no wire plug */
++        val = yt8511_rd_ext(phydev, 0xc);
++        if (val < 0)
++                return val;
++
++        /* ext reg 0xc.b[2:1]
++        00-----25M from pll;
++        01---- 25M from xtl;(default)
++        10-----62.5M from pll;
++        11----125M from pll(here set to this value)
++        */
++        val |= (3 << 1);
++        ret = yt8511_wr_ext(phydev, 0xc, val);
++
++        return ret;
++}
++/*********************end add***************************/
++
+ /**
+  * genphy_update_link - update link status in @phydev
+  * @phydev: target phy_device struct
+@@ -226,6 +315,17 @@ int genphy_update_link(struct phy_device *phydev)
+ {
+ 	unsigned int mii_reg;
+ 
++	/************alientek zuozhongkai add 2021/4/23********/
++	unsigned int phyid1, phyid2;
++
++	phyid1 = phy_read(phydev, MDIO_DEVAD_NONE, MII_PHYSID1);
++	phyid2 = phy_read(phydev, MDIO_DEVAD_NONE, MII_PHYSID2);
++	if((phyid1 == 0X0) && (phyid2 == 0x10a)) {
++		yt8511_config_out_125m(phydev);
++		yt8511_config_txdelay(phydev, 7);
++	}
++	/*********************end add***************************/
++
+ 	/*
+ 	 * Wait if the link is up, and autonegotiation is in progress
+ 	 * (ie - we're capable and it's not done)
+@@ -925,6 +1025,15 @@ struct phy_device *phy_connect(struct mii_dev *bus, int addr,
+ 	if (!phydev)
+ 		phydev = phy_find_by_mask(bus, mask);
+ 
++	/***********zuozhongkai add 2021/4/23****************/	
++	if (!phydev) /* Èç¹û»¹Ã»ÓÐ»ñÈ¡µ½phy_device£¬³¢ÊÔYT8511 	*/
++	{
++		addr = 0;
++		mask = (addr >= 0) ? (1 << addr) : 0xffffffff;
++		phydev = phy_find_by_mask(bus, mask);	
++	}
++	/******************end add****************************/
++
+ 	if (phydev)
+ 		phy_connect_dev(phydev, dev, interface);
+ 	else
+diff --git a/drivers/video/stm32/stm32_ltdc.c b/drivers/video/stm32/stm32_ltdc.c
+index 31b5c7340c3..8221e561062 100644
+--- a/drivers/video/stm32/stm32_ltdc.c
++++ b/drivers/video/stm32/stm32_ltdc.c
+@@ -27,6 +27,9 @@
+ #include <dm/pinctrl.h>
+ #include <linux/bitops.h>
+ 
++#undef CONFIG_VIDEO_BRIDGE
++#define CONFIG_VIDEO_BRIDGE 0
++
+ #if !CONFIG_IS_ENABLED(ARCH_STM32MP)
+ static int stm32_rifsc_grant_access_by_id(ofnode device_node, u32 id)
+ {
