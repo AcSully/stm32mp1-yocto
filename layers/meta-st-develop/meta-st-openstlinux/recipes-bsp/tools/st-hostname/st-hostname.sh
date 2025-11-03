@@ -17,14 +17,14 @@ if $(cat /etc/hostname | grep -qe "$MAC"); then
     # mac address already present on hostname
 else
     #echo "[DEBUG] mac address NOT present"
-    echo ${PREVIOUS_HOST}${MAC} > /etc/hostname
-    hostnamectl hostname ${PREVIOUS_HOST}${MAC}
-    hostnamectl --transient hostname ${PREVIOUS_HOST}${MAC}
+    echo ${PREVIOUS_HOST} > /etc/hostname
+    hostnamectl hostname ${PREVIOUS_HOST}
+    hostnamectl --transient hostname ${PREVIOUS_HOST}
     if $(grep -q SendHostname /usr/lib/systemd/network/80-wired.network) ; then
-        sed -i "s|Hostname=.*$|Hostname=${PREVIOUS_HOST}${MAC}|" /usr/lib/systemd/network/80-wired.network
+        sed -i "s|Hostname=.*$|Hostname=${PREVIOUS_HOST}|" /usr/lib/systemd/network/80-wired.network
     else
         echo "SendHostname=true" >> /usr/lib/systemd/network/80-wired.network
-        echo "Hostname=${PREVIOUS_HOST}${MAC}" >> /usr/lib/systemd/network/80-wired.network
+        echo "Hostname=${PREVIOUS_HOST}" >> /usr/lib/systemd/network/80-wired.network
     fi
 fi
 

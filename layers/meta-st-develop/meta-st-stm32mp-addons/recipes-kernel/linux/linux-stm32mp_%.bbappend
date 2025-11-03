@@ -39,11 +39,12 @@ python() {
     if "stm32mpcommonmx" in machine_overrides:
         d.appendVarFlag('do_configure', 'prefuncs', ' autogenerate_makefile_for_external_dt_cubemx')
 }
+
 FILESEXTRAPATHS:prepend := "${THISDIR}/${PN}/files:${THISDIR}/${PN}:"
 
 SRC_URI += "file://0001-1.-support-touch.patch \
-            file://defconfig"
+            file://develop_defconfig"
 
-# 指定使用你的 defconfig 作为默认配置
-KERNEL_DEFCONFIG = "defconfig"
 
+KERNEL_DEFCONFIG = ""
+KERNEL_EXTERNAL_DEFCONFIG = "develop_defconfig"
