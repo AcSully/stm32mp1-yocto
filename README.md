@@ -61,4 +61,6 @@ Traceback (most recent call last):  File "..../layers/openembedded-core/bitbake/
 On Ubuntu 24.04, in combination with the apparmor package, the Ubuntu kernel now restricts the use of unprivileged user namespaces. This affects all programs on the system that are unprivileged and unconfined. You can disable this restriction by running
 sudo apparmor_parser -R /etc/apparmor.d/unprivileged_userns
 ```
+![f7887f741c213517a6f642a3d4a264c2](https://github.com/user-attachments/assets/623de8eb-21a4-49f0-a29a-490c2a44616b)
+
 
